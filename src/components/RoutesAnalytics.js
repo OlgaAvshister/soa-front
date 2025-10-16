@@ -112,45 +112,52 @@ const RoutesAnalytics = () => {
             </div>
           )}
         </div>
-
-        {/* Маршруты с дистанцией больше */}
-        <div className="analytics-item">
-          <h4>Маршруты с дистанцией больше</h4>
-          <div className="analytics-input-row">
-            <input
-              type="number"
-              value={minDistance}
-              onChange={(e) => setMinDistance(e.target.value)}
-              placeholder="Минимальная дистанция"
-              className="analytics-input"
-              min="1"
-              step="0.1"
-            />
-            <button 
-              onClick={handleGetGreaterThan}
-              disabled={loading === 'greater'}
-              className="btn btn-primary btn-small"
-            >
-              {loading === 'greater' ? 'Поиск...' : 'Найти'}
-            </button>
-          </div>
-          {analytics.greaterThanRoutes && (
-            <div className="success-message">
-              <strong>Результат:</strong><br />
-              Найдено: {analytics.greaterThanRoutes.count || analytics.greaterThanRoutes.routes?.length || 0} маршрутов<br />
-              Минимальная дистанция: {formatNumber(analytics.greaterThanRoutes.minDistance)}<br />
-              Максимальная дистанция: {formatNumber(analytics.greaterThanRoutes.maxDistance)}<br />
-              Средняя дистанция: {formatNumber(analytics.greaterThanRoutes.averageDistance)}<br />
-              <br />
-              <strong>Маршруты:</strong>
-              {analytics.greaterThanRoutes.routes && analytics.greaterThanRoutes.routes.map(route => (
-                <div key={route.id} className="route-item">
-                  #{route.id}: {route.name} - {formatNumber(route.distance)}
-                </div>
-              ))}
+{/* Маршруты с дистанцией больше */}
+<div className="analytics-item">
+  <h4>Маршруты с дистанцией больше</h4>
+  <div className="analytics-input-row">
+    <input
+      type="number"
+      value={minDistance}
+      onChange={(e) => setMinDistance(e.target.value)}
+      placeholder="Минимальная дистанция"
+      className="analytics-input"
+      min="1"
+      step="0.1"
+    />
+    <button 
+      onClick={handleGetGreaterThan}
+      disabled={loading === 'greater'}
+      className="btn btn-primary btn-small"
+    >
+      {loading === 'greater' ? 'Поиск...' : 'Найти'}
+    </button>
+  </div>
+  {analytics.greaterThanRoutes && (
+    <div className="success-message">
+      <strong>Результат:</strong><br />
+      Найдено: {analytics.greaterThanRoutes.count || analytics.greaterThanRoutes.routes?.length || 0} маршрутов<br />
+      
+      {/* Показываем статистику только если есть маршруты */}
+      {(analytics.greaterThanRoutes.count > 0 || analytics.greaterThanRoutes.routes?.length > 0) ? (
+        <>
+          Минимальная дистанция: {formatNumber(analytics.greaterThanRoutes.minDistance)}<br />
+          Максимальная дистанция: {formatNumber(analytics.greaterThanRoutes.maxDistance)}<br />
+          Средняя дистанция: {formatNumber(analytics.greaterThanRoutes.averageDistance)}<br />
+          <br />
+          <strong>Маршруты:</strong>
+          {analytics.greaterThanRoutes.routes && analytics.greaterThanRoutes.routes.map(route => (
+            <div key={route.id} className="route-item">
+              #{route.id}: {route.name} - {formatNumber(route.distance)}
             </div>
-          )}
-        </div>
+          ))}
+        </>
+      ) : (
+        <p>Маршруты с дистанцией больше {minDistance} не найдены</p>
+      )}
+    </div>
+  )}
+</div>
       </div>
     </div>
   );

@@ -86,9 +86,13 @@ const checkServiceAvailability = async (api, serviceName) => {
 };
 const parseRoutesFromXML = (xmlString) => {
   try {
+    console.log('📄 RAW XML RESPONSE:', xmlString);
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
-    
+     console.log('XML Structure:', {
+      totalElements: xmlDoc.getElementsByTagName('totalElements')[0]?.textContent,
+      routeCount: xmlDoc.getElementsByTagName('route').length
+    });
     const parseError = xmlDoc.getElementsByTagName('parsererror');
     if (parseError.length > 0) {
       console.error('Ошибка парсинга XML:', parseError[0].textContent);
@@ -497,64 +501,83 @@ createRouteBetweenExisting: async (idFrom, idTo, distance) => {
   } catch (error) {
     throw handleApiError(error, 'Не удалось создать маршрут между локациями');
   }
-},
+},// В api.js - исправьте функцию getRoutes
 getRoutes: async (filters = {}) => {
-    try {
-      const params = new URLSearchParams();
+  try {
+    const params = new URLSearchParams();
+    
+    // Базовая пагинация
+    params.append('page', filters.page || 0);
+    params.append('size', filters.size || 10);
+    
+if (filters['filterName']) {
+  params.append('filter.name.equals', filters['filterName']);
+}
+    // Остальные фильтры - оставляем как было
+    if (filters['filter.id']) params.append('filter.id', filters['filter.id']);
+    if (filters['filter.distance.min']) params.append('filter.distance.min', filters['filter.distance.min']);
+    if (filters['filter.distance.max']) params.append('filter.distance.max', filters['filter.distance.max']);
+    if (filters['filter.distance.equals']) params.append('filter.distance.equals', filters['filter.distance.equals']);
+    if (filters['filter.fromName']) params.append('filter.fromName', filters['filter.fromName']);
+    if (filters['filter.toName']) params.append('filter.toName', filters['filter.toName']);
+    if (filters['filter.coordinatesX']) params.append('filter.coordinatesX', filters['filter.coordinatesX']);
+    if (filters['filter.coordinatesY']) params.append('filter.coordinatesY', filters['filter.coordinatesY']);
+    if (filters['filter.fromX']) params.append('filter.fromX', filters['filter.fromX']);
+    if (filters['filter.fromY']) params.append('filter.fromY', filters['filter.fromY']);
+    if (filters['filter.toX']) params.append('filter.toX', filters['filter.toX']);
+    if (filters['filter.toY']) params.append('filter.toY', filters['filter.toY']);
+    
+    // ДАТЫ - тоже пробуем по одному варианту
+    if (filters['filter.creationDate.from']) {
+      const fromDate = new Date(filters['filter.creationDate.from']);
+      // Вариант 1: ISO строка
+      params.append('filter.creationDate.from', fromDate.toISOString());
       
-      // Базовая пагинация
-      params.append('page', filters.page || 0);
-      params.append('size', filters.size || 10);
-      
-      // ПРАВИЛЬНЫЕ ПАРАМЕТРЫ ФИЛЬТРАЦИИ согласно документации
-      if (filters.id) params.append('filter.id', filters.id);
-      if (filters.name) params.append('filterName', filters.name);
-      if (filters.minDistance) params.append('filter.distance.min', filters.minDistance);
-      if (filters.maxDistance) params.append('filter.distance.max', filters.maxDistance);
-      if (filters.exactDistance) params.append('filter.distance.equals', filters.exactDistance);
-      if (filters.fromName) params.append('filter.fromName', filters.fromName);
-      if (filters.toName) params.append('filter.toName', filters.toName);
-      if (filters.coordinatesX) params.append('filter.coordinatesX', filters.coordinatesX);
-      if (filters.coordinatesY) params.append('filter.coordinatesY', filters.coordinatesY);
-      if (filters.fromX) params.append('filter.fromX', filters.fromX);
-      if (filters.fromY) params.append('filter.fromY', filters.fromY);
-      if (filters.toX) params.append('filter.toX', filters.toX);
-      if (filters.toY) params.append('filter.toY', filters.toY);
-      
-      // ДАТЫ - правильный формат
-      if (filters.creationDateFrom) {
-        const fromDate = new Date(filters.creationDateFrom);
-        params.append('filter.creationDate.from', fromDate.toISOString());
-      }
-      if (filters.creationDateTo) {
-        const toDate = new Date(filters.creationDateTo);
-        params.append('filter.creationDate.to', toDate.toISOString());
-      }
-      
-      // СОРТИРОВКА - правильный формат
-      if (filters.sort) {
-        if (Array.isArray(filters.sort)) {
-          filters.sort.forEach(sort => params.append('sort', sort));
-        } else {
-          params.append('sort', filters.sort);
-        }
-      }
-      
-      console.log('Параметры запроса:', Object.fromEntries(params));
-      
-      const response = await primaryApi.get('/routes', { 
-        params,
-        timeout: 10000
-      });
-      
-      const result = parseRoutesFromXML(response.data);
-      return result;
-      
-    } catch (error) {
-      throw handleApiError(error, 'Не удалось загрузить маршруты');
+      // Вариант 2: закомментирован
+      // params.append('creationDateFrom', fromDate.getTime());
     }
-  },
-// В api.js - исправьте createRoute
+    if (filters['filter.creationDate.to']) {
+      const toDate = new Date(filters['filter.creationDate.to']);
+      // Вариант 1: ISO строка
+      params.append('filter.creationDate.to', toDate.toISOString());
+      
+      // Вариант 2: закомментирован
+      // params.append('creationDateTo', toDate.getTime());
+    }
+    
+    // СОРТИРОВКА
+    if (filters.sort) {
+      if (Array.isArray(filters.sort)) {
+        filters.sort.forEach(sort => params.append('sort', sort));
+      } else {
+        params.append('sort', filters.sort);
+      }
+    }
+    
+    console.log('🔍 Параметры запроса к API:', Object.fromEntries(params));
+    
+    const response = await primaryApi.get('/routes', { 
+      params,
+      timeout: 10000
+    });
+    
+    const result = parseRoutesFromXML(response.data);
+    
+    // Детальная отладочная информация
+    console.log('📊 Детальный анализ результата:', {
+      totalElements: result.pagination?.totalElements,
+      routesCount: result.routes?.length,
+      hasFilterName: !!filters['filterName'],
+      filterNameValue: filters['filterName'],
+      allRouteNames: result.routes?.map(r => r.name)
+    });
+    
+    return result;
+    
+  } catch (error) {
+    throw handleApiError(error, 'Не удалось загрузить маршруты');
+  }
+},
 createRoute: async (routeData) => {
   try {
     // ПРАВИЛЬНАЯ СТРУКТУРА XML с fromLocation и toLocation
@@ -698,11 +721,6 @@ addRouteBetween: async (idFrom, idTo, distance) => {
       }
     });
     
-    console.log('Ответ от навигатора при создании:', {
-      status: response.status,
-      data: response.data
-    });
-    
     if (response.status === 201 || response.status === 200) {
       // Парсим успешный ответ
       if (typeof response.data === 'string' && response.data.includes('<?xml')) {
@@ -757,11 +775,6 @@ findRoutesBetween: async (idFrom, idTo, orderBy = 'distance') => {
       }
     });
     
-    console.log('📡 Ответ от навигатора:', {
-      status: response.status,
-      statusText: response.statusText,
-      data: response.data
-    });
     
     let result;
     

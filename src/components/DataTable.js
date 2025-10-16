@@ -83,79 +83,93 @@ const DataTable = () => {
     loadData();
   }, []);
 
-  const loadData = async (currentFilters = filters, currentPage = pagination.page, currentSize = pagination.size) => {
-    setLoading(true);
-    setError('');
+const loadData = async (currentFilters = filters, currentPage = pagination.page, currentSize = pagination.size) => {
+  setLoading(true);
+  setError('');
+  
+  try {
+    const apiFilters = {
+      page: currentPage,
+      size: currentSize
+    };
     
-    try {
-      const apiFilters = {
-        page: currentPage,
-        size: currentSize
-      };
-      
-      const filterMapping = {
-        name: 'filterName',
-        id: 'filter.id',
-        minDistance: 'filter.distance.min',
-        maxDistance: 'filter.distance.max', 
-        exactDistance: 'filter.distance.equals',
-        fromName: 'filter.fromName',
-        toName: 'filter.toName',
-        coordinatesX: 'filter.coordinatesX',
-        coordinatesY: 'filter.coordinatesY',
-        fromX: 'filter.fromX',
-        fromY: 'filter.fromY',
-        toX: 'filter.toX',
-        toY: 'filter.toY',
-        creationDateFrom: 'filter.creationDate.from',
-        creationDateTo: 'filter.creationDate.to'
-      };
-      
-      const activeFilters = [];
-      Object.keys(currentFilters).forEach(key => {
-        if (currentFilters[key] && currentFilters[key] !== '') {
-          const apiKey = filterMapping[key] || key;
-          apiFilters[apiKey] = currentFilters[key];
-          activeFilters.push(`${key}: ${currentFilters[key]}`);
+    const filterMapping = {
+      name: 'filterName',
+      id: 'filter.id',
+      minDistance: 'filter.distance.min',
+      maxDistance: 'filter.distance.max', 
+      exactDistance: 'filter.distance.equals',
+      fromName: 'filter.fromName',
+      toName: 'filter.toName',
+      coordinatesX: 'filter.coordinatesX',
+      coordinatesY: 'filter.coordinatesY',
+      fromX: 'filter.fromX',
+      fromY: 'filter.fromY',
+      toX: 'filter.toX',
+      toY: 'filter.toY',
+      creationDateFrom: 'filter.creationDate.from',
+      creationDateTo: 'filter.creationDate.to'
+    };
+    
+    const activeFilters = [];
+    Object.keys(currentFilters).forEach(key => {
+      if (currentFilters[key] && currentFilters[key] !== '') {
+        const apiKey = filterMapping[key] || key;
+        apiFilters[apiKey] = currentFilters[key];
+        activeFilters.push(`${key}: ${currentFilters[key]}`);
+        
+        // Отладочная информация для проблемных фильтров
+        if (key === 'name' || key.includes('Date')) {
+          console.log(`🎯 Фильтр ${key} -> ${apiKey}:`, currentFilters[key]);
         }
-      });
-      
-      if (sortFields.length > 0) {
-        const sortParams = sortFields.map(sort => `${sort.field},${sort.direction}`);
-        apiFilters.sort = sortParams;
       }
-      
-      console.log('Загрузка с параметрами:', apiFilters);
-      
-      const result = await primaryService.getRoutes(apiFilters);
-      
-      if (result && Array.isArray(result.routes)) {
-        setData(result.routes);
-        setPagination({
-          page: result.pagination.currentPage,
-          size: result.pagination.pageSize,
-          totalElements: result.pagination.totalElements,
-          totalPages: result.pagination.totalPages
-        });
-      } else {
-        setData([]);
-        setPagination({
-          page: 0,
-          size: currentSize,
-          totalElements: 0,
-          totalPages: 1
-        });
-      }
-      
-    } catch (err) {
-      console.error('❌ Ошибка загрузки:', err);
-      setError(err.message);
-      setData([]);
-      addNotification(`❌ Ошибка загрузки: ${err.message}`, 'error');
-    } finally {
-      setLoading(false);
+    });
+    
+    console.log('🎯 Активные фильтры:', activeFilters);
+    
+    if (sortFields.length > 0) {
+      const sortParams = sortFields.map(sort => `${sort.field},${sort.direction}`);
+      apiFilters.sort = sortParams;
     }
-  };
+    
+    console.log('🚀 Загрузка с параметрами:', apiFilters);
+    
+    const result = await primaryService.getRoutes(apiFilters);
+    
+    // Проверяем результат
+    console.log('✅ Результат загрузки:', {
+      totalElements: result.pagination?.totalElements,
+      routesCount: result.routes?.length,
+      routes: result.routes?.map(r => ({ id: r.id, name: r.name, creationDate: r.creationDate }))
+    });
+    
+    if (result && Array.isArray(result.routes)) {
+      setData(result.routes);
+      setPagination({
+        page: result.pagination.currentPage,
+        size: result.pagination.pageSize,
+        totalElements: result.pagination.totalElements,
+        totalPages: result.pagination.totalPages
+      });
+    } else {
+      setData([]);
+      setPagination({
+        page: 0,
+        size: currentSize,
+        totalElements: 0,
+        totalPages: 1
+      });
+    }
+    
+  } catch (err) {
+    console.error('❌ Ошибка загрузки:', err);
+    setError(err.message);
+    setData([]);
+    addNotification(`❌ Ошибка загрузки: ${err.message}`, 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const validateFilters = (filters) => {
     const errors = [];

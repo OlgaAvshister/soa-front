@@ -76,13 +76,7 @@ const AddRouteBetween = ({ onRouteAdded, onCancel }) => {
       setLoading(false);
       return;
     }
-
-    if (formData.idFrom === formData.idTo) {
-      setError('Начальная и конечная точки не могут быть одинаковыми');
-      setLoading(false);
-      return;
-    }
-
+    
     try {
       // Используем улучшенную функцию
       const result = await secondaryService.addRouteBetween(

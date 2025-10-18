@@ -7,34 +7,41 @@ const ServiceStatus = () => {
   });
   const [lastChecked, setLastChecked] = useState(null);
 
-  const checkService = async (url, name) => {
-    try {
-      const response = await fetch(url, { 
-        method: 'GET',
-        mode: 'no-cors'
-      });
-      return { status: 'online', message: '' }; // УБИРАЕМ "Сервис доступен"
-    } catch (error) {
-      return { status: 'offline', message: `Ошибка подключения` };
-    }
-  };
-
-  const checkAllServices = async () => {
-    const primaryResult = await checkService(
-      'http://localhost:18080/route-management-service/application.wadl',
-      'primary'
-    );
-    const secondaryResult = await checkService(
-      'http://localhost:18081/navigator-service/application.wadl', 
-      'secondary'
-    );
-
-    setServices({
-      primary: primaryResult,
-      secondary: secondaryResult
+// ServiceStatus.js
+const checkService = async (url, name) => {
+  try {
+    // Используем fetch с ignoreCors для проверки статуса
+    const response = await fetch(url, { 
+      method: 'GET',
+      mode: 'no-cors' // Игнорируем CORS и SSL ошибки
     });
-    setLastChecked(new Date());
-  };
+    
+    // В режиме no-cors response всегда ok, но если нет ошибки - сервис доступен
+    return { status: 'online', message: '' };
+    
+  } catch (error) {
+    console.error(`Ошибка проверки ${name}:`, error);
+    return { status: 'offline', message: `SSL ошибка - используется самоподписанный сертификат` };
+  }
+};
+
+// ServiceStatus.js
+const checkAllServices = async () => {
+  const primaryResult = await checkService(
+    'https://localhost:18443/route-management-service/application.wadl',
+    'primary'
+  );
+  const secondaryResult = await checkService(
+    'https://localhost:18444/navigator-service/application.wadl', 
+    'secondary'
+  );
+
+  setServices({
+    primary: primaryResult,
+    secondary: secondaryResult
+  });
+  setLastChecked(new Date());
+};
 
   useEffect(() => {
     checkAllServices();
@@ -64,7 +71,7 @@ const ServiceStatus = () => {
               ></span>
               <strong>
                 {key === 'primary' ? 'Route Management Service' : 'Navigator Service'} 
-                (порт {key === 'primary' ? '18080' : '18081'})
+                (порт {key === 'primary' ? '18443' : '18444'})
               </strong>
             </div>
             <div className="status-details">

@@ -1,32 +1,38 @@
 import axios from 'axios';
-
-const PRIMARY_SERVICE_URL = 'http://localhost:18080/route-management-service';
-const SECONDARY_SERVICE_URL = 'http://localhost:18081/navigator-service';
+// api.js
+const PRIMARY_SERVICE_URL = 'https://localhost:18443/route-management-service';
+const SECONDARY_SERVICE_URL = 'https://localhost:18444/navigator-service';
 
 const primaryApi = axios.create({
   baseURL: PRIMARY_SERVICE_URL,
-  timeout: 15000,
+  timeout: parseInt(process.env.REACT_APP_API_TIMEOUT) || 15000,
   headers: {
-    'Accept': 'application/xml, application/json',
+    'Accept': 'application/xml',
     'Content-Type': 'application/xml'
   }
 });
 
 const secondaryApi = axios.create({
   baseURL: SECONDARY_SERVICE_URL,
-  timeout: 15000,
+  timeout: parseInt(process.env.REACT_APP_API_TIMEOUT) || 15000,
   headers: {
-    'Accept': 'application/xml, application/json',
+    'Accept': 'application/xml',
     'Content-Type': 'application/xml'
   }
 });
 
-// Добавьте interceptors для CORS
-secondaryApi.interceptors.request.use(
-  (config) => {
-    return config;
-  },
-  (error) => {
+primaryApi.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('Primary API Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+secondaryApi.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('Secondary API Error:', error);
     return Promise.reject(error);
   }
 );
@@ -289,23 +295,10 @@ getRouteById: async (id) => {
 },
 updateRoute: async (id, routeData) => {
   try {
+    // ТОЛЬКО ИЗМЕНЯЕМЫЕ ПОЛЯ - как в рабочем скрипте
     const xmlData = `<?xml version="1.0" encoding="UTF-8"?>
 <RouteUpdateRequest>
   <name>${routeData.name}</name>
-  <coordinates>
-    <x>${routeData.coordinates?.x || 0}</x>
-    <y>${routeData.coordinates?.y || 0}</y>
-  </coordinates>
-  <fromLocation>
-    <x>${routeData.from?.x || 0}</x>
-    <y>${routeData.from?.y || 0}</y>
-    <name>${routeData.from?.name}</name>
-  </fromLocation>
-  <toLocation>
-    <x>${routeData.to?.x || 0}</x>
-    <y>${routeData.to?.y || 0}</y>
-    <name>${routeData.to?.name}</name>
-  </toLocation>
   <distance>${routeData.distance}</distance>
 </RouteUpdateRequest>`;
 
@@ -510,41 +503,21 @@ getRoutes: async (filters = {}) => {
     params.append('page', filters.page || 0);
     params.append('size', filters.size || 10);
     
-if (filters['filterName']) {
-  params.append('filter.name.equals', filters['filterName']);
-}
-    // Остальные фильтры - оставляем как было
-    if (filters['filter.id']) params.append('filter.id', filters['filter.id']);
-    if (filters['filter.distance.min']) params.append('filter.distance.min', filters['filter.distance.min']);
-    if (filters['filter.distance.max']) params.append('filter.distance.max', filters['filter.distance.max']);
-    if (filters['filter.distance.equals']) params.append('filter.distance.equals', filters['filter.distance.equals']);
-    if (filters['filter.fromName']) params.append('filter.fromName', filters['filter.fromName']);
-    if (filters['filter.toName']) params.append('filter.toName', filters['filter.toName']);
-    if (filters['filter.coordinatesX']) params.append('filter.coordinatesX', filters['filter.coordinatesX']);
-    if (filters['filter.coordinatesY']) params.append('filter.coordinatesY', filters['filter.coordinatesY']);
-    if (filters['filter.fromX']) params.append('filter.fromX', filters['filter.fromX']);
-    if (filters['filter.fromY']) params.append('filter.fromY', filters['filter.fromY']);
-    if (filters['filter.toX']) params.append('filter.toX', filters['filter.toX']);
-    if (filters['filter.toY']) params.append('filter.toY', filters['filter.toY']);
-    
-    // ДАТЫ - тоже пробуем по одному варианту
-    if (filters['filter.creationDate.from']) {
-      const fromDate = new Date(filters['filter.creationDate.from']);
-      // Вариант 1: ISO строка
-      params.append('filter.creationDate.from', fromDate.toISOString());
+ Object.keys(filters).forEach(key => {
+      // Пропускаем служебные параметры
+      if (key === 'page' || key === 'size' || key === 'sort') return;
       
-      // Вариант 2: закомментирован
-      // params.append('creationDateFrom', fromDate.getTime());
-    }
-    if (filters['filter.creationDate.to']) {
-      const toDate = new Date(filters['filter.creationDate.to']);
-      // Вариант 1: ISO строка
-      params.append('filter.creationDate.to', toDate.toISOString());
-      
-      // Вариант 2: закомментирован
-      // params.append('creationDateTo', toDate.getTime());
-    }
-    
+      const value = filters[key];
+      if (value !== undefined && value !== null && value !== '') {
+        // Для параметров с точками (filter.creationDate.gte) используем как есть
+        if (key.includes('.')) {
+          params.append(key, value);
+        } else {
+          // Для простых параметров
+          params.append(key, value);
+        }
+      }
+    });
     // СОРТИРОВКА
     if (filters.sort) {
       if (Array.isArray(filters.sort)) {
@@ -580,27 +553,20 @@ if (filters['filterName']) {
 },
 createRoute: async (routeData) => {
   try {
-    // ПРАВИЛЬНАЯ СТРУКТУРА XML с fromLocation и toLocation
-    const xmlData = `<?xml version="1.0" encoding="UTF-8"?>
-<RouteCreateRequest>
-  <name>${routeData.name || 'Новый маршрут'}</name>
-  <coordinates>
-    <x>${routeData.coordinates?.x || 0}</x>
-    <y>${routeData.coordinates?.y || 0}</y>
-  </coordinates>
-  <fromLocation>
-    <x>${routeData.from?.x || 0}</x>
-    <y>${routeData.from?.y || 0}</y>
-    <name>${routeData.from?.name || 'Начальная точка'}</name>
-  </fromLocation>
-  <toLocation>
-    <x>${routeData.to?.x || 0}</x>
-    <y>${routeData.to?.y || 0}</y>
-    <name>${routeData.to?.name || 'Конечная точка'}</name>
-  </toLocation>
-  <distance>${routeData.distance || 100}</distance>
-</RouteCreateRequest>`;
+    console.log('🔍 routeData для создания:', routeData);
     
+    // Проверяем каждое поле на null/undefined
+    const fieldsToCheck = [
+      'name', 'coordinates.x', 'coordinates.y', 
+      'from.name', 'from.x', 'from.y',
+      'to.name', 'to.x', 'to.y', 'distance'
+    ];
+    
+    fieldsToCheck.forEach(field => {
+      const value = field.split('.').reduce((obj, key) => obj?.[key], routeData);
+      console.log(`${field}:`, value, 'is null?', value === null, 'is undefined?', value === undefined);
+    });
+    const xmlData = `<?xml version="1.0" encoding="UTF-8"?><RouteCreateRequest><name>${routeData.name}</name><coordinates><x>${Math.floor(routeData.coordinates?.x || 0)}</x><y>${Math.floor(routeData.coordinates?.y || 0)}</y></coordinates><fromLocation><name>${routeData.from?.name}</name><x>${Math.floor(routeData.from?.x || 0)}</x><y>${Math.floor(routeData.from?.y || 0)}</y></fromLocation><toLocation><name>${routeData.to?.name}</name><x>${Math.floor(routeData.to?.x || 0)}</x><y>${Math.floor(routeData.to?.y || 0)}</y></toLocation><distance>${routeData.distance}</distance></RouteCreateRequest>`;
     console.log('Отправляемый XML для создания:', xmlData);
     
     const response = await primaryApi.post('/routes', xmlData, {
@@ -771,7 +737,7 @@ findRoutesBetween: async (idFrom, idTo, orderBy = 'distance') => {
     const response = await secondaryApi.get(correctEndpoint, {
       validateStatus: null,
       headers: {
-        'Accept': 'application/xml, application/json'
+        'Accept': 'application/xml'
       }
     });
     

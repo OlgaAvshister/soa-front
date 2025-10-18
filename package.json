@@ -1,6 +1,7 @@
 {
   "name": "lab1-frontend",
   "version": "1.0.0",
+  "proxy": "https://localhost:18443",
   "description": "Frontend for laboratory work #1",
   "main": "src/index.js",
   "scripts": {
@@ -10,9 +11,10 @@
     "eject": "react-scripts eject"
   },
   "dependencies": {
+    "axios": "^1.5.0",
+    "cross-fetch": "^4.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "axios": "^1.5.0",
     "react-scripts": "5.0.1"
   },
   "browserslist": {
@@ -26,5 +28,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "http-proxy-middleware": "^3.0.5"
   }
 }

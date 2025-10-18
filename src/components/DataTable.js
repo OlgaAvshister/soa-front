@@ -82,7 +82,29 @@ const DataTable = () => {
   useEffect(() => {
     loadData();
   }, []);
-
+// DataTable.js - добавьте перед функцией handleFilterChange
+const validateFilters = (filters) => {
+  const errors = [];
+  
+  if (filters.creationDateFrom && filters.creationDateTo) {
+    const from = new Date(filters.creationDateFrom);
+    const to = new Date(filters.creationDateTo);
+    
+    if (from > to) {
+      errors.push('Дата "от" не может быть позже даты "до"');
+    }
+  }
+  
+  if (filters.minDistance && filters.maxDistance) {
+    const min = parseFloat(filters.minDistance);
+    const max = parseFloat(filters.maxDistance);
+    if (min > max) {
+      errors.push('Минимальная дистанция не может быть больше максимальной');
+    }
+  }
+  
+  return errors;
+};
 const loadData = async (currentFilters = filters, currentPage = pagination.page, currentSize = pagination.size) => {
   setLoading(true);
   setError('');
@@ -107,8 +129,8 @@ const loadData = async (currentFilters = filters, currentPage = pagination.page,
       fromY: 'filter.fromY',
       toX: 'filter.toX',
       toY: 'filter.toY',
-      creationDateFrom: 'filter.creationDate.from',
-      creationDateTo: 'filter.creationDate.to'
+      creationDateFrom: 'filter.creationDate.gte',
+      creationDateTo: 'filter.creationDate.lte'
     };
     
     const activeFilters = [];
@@ -117,11 +139,6 @@ const loadData = async (currentFilters = filters, currentPage = pagination.page,
         const apiKey = filterMapping[key] || key;
         apiFilters[apiKey] = currentFilters[key];
         activeFilters.push(`${key}: ${currentFilters[key]}`);
-        
-        // Отладочная информация для проблемных фильтров
-        if (key === 'name' || key.includes('Date')) {
-          console.log(`🎯 Фильтр ${key} -> ${apiKey}:`, currentFilters[key]);
-        }
       }
     });
     
@@ -170,74 +187,39 @@ const loadData = async (currentFilters = filters, currentPage = pagination.page,
     setLoading(false);
   }
 };
-
-  const validateFilters = (filters) => {
-    const errors = [];
-    
-    if (filters.creationDateFrom && filters.creationDateTo) {
-      const from = new Date(filters.creationDateFrom);
-      const to = new Date(filters.creationDateTo);
-      
-      if (from > to) {
-        errors.push('Дата "от" не может быть позже даты "до"');
-      }
-    }
-    
-    if (filters.minDistance && filters.maxDistance) {
-      const min = parseFloat(filters.minDistance);
-      const max = parseFloat(filters.maxDistance);
-      if (min > max) {
-        errors.push('Минимальная дистанция не может быть больше максимальной');
-      }
-    }
-    return errors;
+const handleFilterChange = (field, value) => {
+  const newFilters = {
+    ...filters,
+    [field]: value
   };
+  
+  setFilters(newFilters);
+  
+  if (filterTimeout) {
+    clearTimeout(filterTimeout);
+  }
 
-  const handleFilterChange = (field, value) => {
-    const newFilters = {
-      ...filters,
-      [field]: value
-    };
-    
-    setFilters(newFilters);
-    
-    if (filterTimeout) {
-      clearTimeout(filterTimeout);
-    }
-    
-    if (field === 'creationDateFrom' || field === 'creationDateTo') {
-      const errors = validateFilters(newFilters);
-      if (errors.length > 0) {
-        alert(`❌ Ошибка в фильтрах:\n\n${errors.join('\n')}\n\nПожалуйста, исправьте даты.`);
-        errors.forEach(error => addNotification(`❌ ${error}`, 'warning'));
-        return;
-      }
-      
-      if (newFilters.creationDateFrom && newFilters.creationDateTo) {
-        const timeout = setTimeout(() => {
-          loadData(newFilters, 0, pagination.size);
-        }, 300);
-        setFilterTimeout(timeout);
-        return;
-      }
-      
+  // Валидация дат
+  if (field === 'creationDateFrom' || field === 'creationDateTo') {
+    const errors = validateFilters(newFilters);
+    if (errors.length > 0) {
+      alert(`❌ Ошибка в фильтрах:\n\n${errors.join('\n')}\n\nПожалуйста, исправьте даты.`);
+      errors.forEach(error => addNotification(`❌ ${error}`, 'warning'));
       return;
     }
-    
-    const timeout = setTimeout(() => {
-      const errors = validateFilters(newFilters);
-      if (errors.length > 0) {
-        if (errors.some(error => error.includes('дистанция') || error.includes('дата'))) {
-          alert(`❌ Ошибка в фильтрах:\n\n${errors.join('\n')}\n\nПожалуйста, исправьте значения.`);
-        }
-        errors.forEach(error => addNotification(`❌ ${error}`, 'warning'));
-        return;
-      }
-      loadData(newFilters, 0, pagination.size);
-    }, field === 'name' ? 600 : 300);
-    
-    setFilterTimeout(timeout);
-  };
+  }
+
+  const timeout = setTimeout(() => {
+    const errors = validateFilters(newFilters);
+    if (errors.length > 0) {
+      errors.forEach(error => addNotification(`❌ ${error}`, 'warning'));
+      return;
+    }
+    loadData(newFilters, 0, pagination.size);
+  }, field === 'name' ? 600 : 300);
+  
+  setFilterTimeout(timeout);
+};
 
   const handleClearFilters = () => {
     const clearedFilters = {
@@ -416,6 +398,8 @@ const loadData = async (currentFilters = filters, currentPage = pagination.page,
         <td className="route-name">
           <div className="route-name-cell">
             <strong>{route.name}</strong>
+          </div>
+          <div>
             {route.creationDate && (
               <small className="creation-date">
                 Создан: {new Date(route.creationDate).toLocaleDateString('ru-RU')}

@@ -116,7 +116,7 @@ const loadData = async (currentFilters = filters, currentPage = pagination.page,
     };
     
     const filterMapping = {
-      name: 'filterName',
+      name: 'filter.name',
       id: 'filter.id',
       minDistance: 'filter.distance.min',
       maxDistance: 'filter.distance.max', 

@@ -104,8 +104,7 @@ const validateFilters = (filters) => {
   }
   
   return errors;
-};
-const loadData = async (currentFilters = filters, currentPage = pagination.page, currentSize = pagination.size) => {
+};const loadData = async (currentFilters = filters, currentPage = pagination.page, currentSize = pagination.size) => {
   setLoading(true);
   setError('');
   
@@ -144,29 +143,37 @@ const loadData = async (currentFilters = filters, currentPage = pagination.page,
     
     console.log('🎯 Активные фильтры:', activeFilters);
     
-    if (sortFields.length > 0) {
+    // СОРТИРОВКА ПО УМОЛЧАНИЮ - если нет пользовательских сортировок и фильтров
+    const hasActiveFilters = Object.values(currentFilters).some(value => value && value !== '');
+    
+    if (sortFields.length === 0 && !hasActiveFilters) {
+      // Сортировка по ID по убыванию (новые сверху)
+      apiFilters.sort = ['id,desc'];
+      console.log('🎯 Применена сортировка по умолчанию: id,desc');
+    } else if (sortFields.length > 0) {
       const sortParams = sortFields.map(sort => `${sort.field},${sort.direction}`);
       apiFilters.sort = sortParams;
+      console.log('🎯 Применена пользовательская сортировка:', sortParams);
     }
     
     console.log('🚀 Загрузка с параметрами:', apiFilters);
     
-    const result = await primaryService.getRoutes(apiFilters);
+    const response = await primaryService.getRoutes(apiFilters);
     
     // Проверяем результат
     console.log('✅ Результат загрузки:', {
-      totalElements: result.pagination?.totalElements,
-      routesCount: result.routes?.length,
-      routes: result.routes?.map(r => ({ id: r.id, name: r.name, creationDate: r.creationDate }))
+      totalElements: response.pagination?.totalElements,
+      routesCount: response.routes?.length,
+      routes: response.routes?.map(r => ({ id: r.id, name: r.name, creationDate: r.creationDate }))
     });
     
-    if (result && Array.isArray(result.routes)) {
-      setData(result.routes);
+    if (response && Array.isArray(response.routes)) {
+      setData(response.routes);
       setPagination({
-        page: result.pagination.currentPage,
-        size: result.pagination.pageSize,
-        totalElements: result.pagination.totalElements,
-        totalPages: result.pagination.totalPages
+        page: response.pagination?.currentPage || 0,
+        size: response.pagination?.pageSize || currentSize,
+        totalElements: response.pagination?.totalElements || 0,
+        totalPages: response.pagination?.totalPages || 1
       });
     } else {
       setData([]);

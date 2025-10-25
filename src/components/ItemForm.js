@@ -88,41 +88,93 @@ const ItemForm = ({ onItemCreated }) => {
   }
 };
 
-  const handleChange = (e) => {
+const handleChange = (e) => {
   const { name, value } = e.target;
   
-  if (name.startsWith('coordinates.')) {
-    const field = name.split('.')[1];
-    setFormData(prev => ({
-      ...prev,
-      coordinates: { 
-        ...prev.coordinates, 
-        [field]: value === '' ? 0 : parseFloat(value) || 0 
-      }
-    }));
-  } else if (name.startsWith('from.')) {
-    const field = name.split('.')[1];
-    setFormData(prev => ({
-      ...prev,
-      from: { 
-        ...prev.from, 
-        [field]: field === 'name' ? value : (value === '' ? 0 : parseFloat(value) || 0)
-      }
-    }));
-  } else if (name.startsWith('to.')) {
-    const field = name.split('.')[1];
-    setFormData(prev => ({
-      ...prev,
-      to: { 
-        ...prev.to, 
-        [field]: field === 'name' ? value : (value === '' ? 0 : parseFloat(value) || 0)
-      }
-    }));
+  console.log('📝 Изменение поля:', name, 'значение:', value);
+  
+  // ОБРАБОТКА КООРДИНАТ - только целые числа (кроме name)
+  if ((name.includes('.x') || name.includes('.y')) && !name.includes('name')) {
+    // Разрешаем только цифры и минус для координат
+    const numericValue = value.replace(/[^\d-]/g, '');
+    const finalValue = numericValue === '' ? '' : parseInt(numericValue) || 0;
+    
+    if (name.startsWith('coordinates.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        coordinates: { 
+          ...prev.coordinates, 
+          [field]: finalValue
+        }
+      }));
+    } else if (name.startsWith('from.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        from: { 
+          ...prev.from, 
+          [field]: finalValue
+        }
+      }));
+    } else if (name.startsWith('to.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        to: { 
+          ...prev.to, 
+          [field]: finalValue
+        }
+      }));
+    }
+  } 
+  // ДИСТАНЦИЯ - дробное число
+  else if (name === 'distance') {
+    // Если текущее значение 0 и пользователь вводит цифру - заменяем 0
+    if (formData.distance === 0 && value !== '' && value !== '0' && !value.includes('.')) {
+      const cleanValue = value.replace(/[^\d.]/g, '');
+      setFormData(prev => ({
+        ...prev,
+        [name]: cleanValue
+      }));
+    } else {
+      // Обычная обработка
+      const numericValue = value.replace(/[^\d.-]/g, '');
+      const cleanValue = numericValue.replace(/(\..*)\./g, '$1');
+      const finalValue = cleanValue === '' ? '' : parseFloat(cleanValue) || 0;
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: finalValue
+      }));
+    }
   } else {
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'distance' ? (value === '' ? 0 : parseFloat(value) || 0) : value
-    }));
+    // ТЕКСТОВЫЕ ПОЛЯ (name, from.name, to.name) - без ограничений
+    if (name.startsWith('from.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        from: { 
+          ...prev.from, 
+          [field]: value
+        }
+      }));
+    } else if (name.startsWith('to.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        to: { 
+          ...prev.to, 
+          [field]: value
+        }
+      }));
+    } else {
+      // Поле name маршрута
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   }
 };
   return (
@@ -152,7 +204,6 @@ const ItemForm = ({ onItemCreated }) => {
               <label>X</label>
               <input
                 type="number"
-                step="0.1"
                 name="coordinates.x"
                 value={formData.coordinates.x || ''}
                 onChange={handleChange}
@@ -163,7 +214,6 @@ const ItemForm = ({ onItemCreated }) => {
               <label>Y</label>
               <input
                 type="number"
-                step="0.1"
                 name="coordinates.y"
                 value={formData.coordinates.y || ''}
                 onChange={handleChange}
@@ -193,7 +243,6 @@ const ItemForm = ({ onItemCreated }) => {
               <label>X</label>
               <input
                 type="number"
-                step="0.1"
                 name="from.x"
                 value={formData.from.x || ''}
                 onChange={handleChange}
@@ -204,7 +253,6 @@ const ItemForm = ({ onItemCreated }) => {
               <label>Y</label>
               <input
                 type="number"
-                step="0.1"
                 name="from.y"
                 value={formData.from.y || ''}
                 onChange={handleChange}
@@ -234,7 +282,6 @@ const ItemForm = ({ onItemCreated }) => {
               <label>X</label>
               <input
                 type="number"
-                step="0.1"
                 name="to.x"
                 value={formData.to.x || ''}
                 onChange={handleChange}
@@ -245,7 +292,6 @@ const ItemForm = ({ onItemCreated }) => {
               <label>Y</label>
               <input
                 type="number"
-                step="0.1"
                 name="to.y"
                 value={formData.to.y || ''}
                 onChange={handleChange}

@@ -106,13 +106,27 @@ const AddRouteBetween = ({ onRouteAdded, onCancel }) => {
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+const handleChange = (e) => {
+  const { name, value } = e.target;
+  
+  if (name === 'distance') {
+    // Дистанция - дробное число
+    const numericValue = value.replace(/[^\d.-]/g, '');
+    const cleanValue = numericValue.replace(/(\..*)\./g, '$1');
+    
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'distance' ? (value === '' ? '' : parseFloat(value) || 0) : value
+      [name]: cleanValue === '' ? '' : parseFloat(cleanValue) || 0
     }));
-  };
+  } else {
+    // ID - целые числа
+    const numericValue = value.replace(/[^\d-]/g, '');
+    setFormData(prev => ({
+      ...prev,
+      [name]: numericValue === '' ? '' : parseInt(numericValue) || 0
+    }));
+  }
+};
 
   return (
     <div className="item-form-container">

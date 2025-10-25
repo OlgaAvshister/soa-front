@@ -95,10 +95,12 @@ const parseRoutesFromXML = (xmlString) => {
     console.log('📄 RAW XML RESPONSE:', xmlString);
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, "text/xml");
-     console.log('XML Structure:', {
+    
+    console.log('XML Structure:', {
       totalElements: xmlDoc.getElementsByTagName('totalElements')[0]?.textContent,
       routeCount: xmlDoc.getElementsByTagName('route').length
     });
+    
     const parseError = xmlDoc.getElementsByTagName('parsererror');
     if (parseError.length > 0) {
       console.error('Ошибка парсинга XML:', parseError[0].textContent);
@@ -130,17 +132,38 @@ const parseRoutesFromXML = (xmlString) => {
         return text ? parseFloat(text) : 0;
       };
 
-const getLocationData = (locationTagName) => {
-  const locationElement = route.getElementsByTagName(locationTagName)[0];
-  if (!locationElement) return { name: '', x: 0, y: 0, id: null };
-  
-  return {
-    name: locationElement.getElementsByTagName('name')[0]?.textContent || '',
-    x: parseFloat(locationElement.getElementsByTagName('x')[0]?.textContent) || 0,
-    y: parseFloat(locationElement.getElementsByTagName('y')[0]?.textContent) || 0,
-    id: parseInt(locationElement.getElementsByTagName('id')[0]?.textContent) || null
-  };
-};   
+      // ИСПРАВЛЕННЫЙ ПАРСИНГ КООРДИНАТ
+      const getCoordinates = () => {
+        const coordinatesElement = route.getElementsByTagName('coordinates')[0];
+        if (!coordinatesElement) return { x: 0, y: 0 };
+        
+        // Ищем x и y в любом месте внутри coordinates
+        const xElements = coordinatesElement.getElementsByTagName('x');
+        const yElements = coordinatesElement.getElementsByTagName('y');
+        
+        const x = xElements.length > 0 ? xElements[0].textContent : '0';
+        const y = yElements.length > 0 ? yElements[0].textContent : '0';
+        
+        console.log('📍 Координаты из XML:', { x, y });
+        
+        return {
+          x: x ? parseInt(x) : 0,
+          y: y ? parseInt(y) : 0
+        };
+      };
+
+      const getLocationData = (locationTagName) => {
+        const locationElement = route.getElementsByTagName(locationTagName)[0];
+        if (!locationElement) return { name: '', x: 0, y: 0, id: null };
+        
+        return {
+          name: locationElement.getElementsByTagName('name')[0]?.textContent || '',
+          x: parseInt(locationElement.getElementsByTagName('x')[0]?.textContent) || 0,
+          y: parseInt(locationElement.getElementsByTagName('y')[0]?.textContent) || 0,
+          id: parseInt(locationElement.getElementsByTagName('id')[0]?.textContent) || null
+        };
+      };   
+      
       const creationDateText = getText('creationDate');
       let creationDate = null;
       if (creationDateText) {
@@ -155,15 +178,13 @@ const getLocationData = (locationTagName) => {
         id: parseInt(getText('id')) || 0,
         name: getText('name'),
         distance: getNumber('distance'),
-        coordinates: {
-          x: getNumber('coordinates.x') || 0,
-          y: getNumber('coordinates.y') || 0
-        },
-       from: getLocationData('fromLocation'),
-to: getLocationData('toLocation'),
-        creationDate: creationDate // Сохраняем как ISO строку
+        coordinates: getCoordinates(),
+        from: getLocationData('fromLocation'),
+        to: getLocationData('toLocation'),
+        creationDate: creationDate
       };
       
+      console.log('📊 Распарсенный маршрут:', routeData);
       routes.push(routeData);
     }
     
@@ -177,7 +198,6 @@ to: getLocationData('toLocation'),
     return { routes: [], pagination: {} };
   }
 };
-// Вспомогательная функция для парсинга одного маршрута
 const parseSingleRouteFromXML = (routeElement) => {
   const getText = (tagName) => {
     const elements = routeElement.getElementsByTagName(tagName);
@@ -188,6 +208,26 @@ const parseSingleRouteFromXML = (routeElement) => {
     const text = getText(tagName);
     return text ? parseFloat(text) : 0;
   };
+
+  // ИСПРАВЛЕННЫЙ ПАРСИНГ КООРДИНАТ - ищем x и y в любом месте внутри coordinates
+  const getCoordinates = () => {
+    const coordinatesElement = routeElement.getElementsByTagName('coordinates')[0];
+    if (!coordinatesElement) return { x: 0, y: 0 };
+    
+    // Ищем x и y в любом месте внутри coordinates
+    const xElements = coordinatesElement.getElementsByTagName('x');
+    const yElements = coordinatesElement.getElementsByTagName('y');
+    
+    const x = xElements.length > 0 ? xElements[0].textContent : '0';
+    const y = yElements.length > 0 ? yElements[0].textContent : '0';
+    
+    console.log('📍 Координаты из XML (single):', { x, y });
+    
+    return {
+      x: x ? parseInt(x) : 0,
+      y: y ? parseInt(y) : 0
+    };
+  };
   
   const getLocationData = (locationTagName) => {
     const locationElement = routeElement.getElementsByTagName(locationTagName)[0];
@@ -195,8 +235,8 @@ const parseSingleRouteFromXML = (routeElement) => {
     
     return {
       name: locationElement.getElementsByTagName('name')[0]?.textContent || '',
-      x: parseFloat(locationElement.getElementsByTagName('x')[0]?.textContent) || 0,
-      y: parseFloat(locationElement.getElementsByTagName('y')[0]?.textContent) || 0,
+      x: parseInt(locationElement.getElementsByTagName('x')[0]?.textContent) || 0,
+      y: parseInt(locationElement.getElementsByTagName('y')[0]?.textContent) || 0,
       id: parseInt(locationElement.getElementsByTagName('id')[0]?.textContent) || null
     };
   };
@@ -212,62 +252,19 @@ const parseSingleRouteFromXML = (routeElement) => {
     }
   }
   
-  return {
+  const routeData = {
     id: parseInt(getText('id')) || 0,
     name: getText('name'),
     distance: getNumber('distance'),
-    coordinates: {
-      x: getNumber('coordinates.x') || 0,
-      y: getNumber('coordinates.y') || 0
-    },
+    coordinates: getCoordinates(), // ← ИСПОЛЬЗУЕМ ИСПРАВЛЕННУЮ ФУНКЦИЮ
     from: getLocationData('fromLocation'),
-to: getLocationData('toLocation'),
+    to: getLocationData('toLocation'),
     creationDate: creationDate
   };
-};
-const createRouteViaPrimaryService = async (idFrom, idTo, distance) => {
-  try {
-    
-    // Получаем информацию о локациях
-    const allRoutes = await primaryService.getRoutes({ size: 1000 });
-    const fromLocation = allRoutes.routes.find(r => r.from?.id === parseInt(idFrom))?.from;
-    const toLocation = allRoutes.routes.find(r => r.to?.id === parseInt(idTo))?.to;
-    
-    if (!fromLocation || !toLocation) {
-      throw new Error('Не удалось найти информацию о локациях');
-    }
-    
-    // Создаем маршрут через основной сервис
-    const routeData = {
-      name: `Маршрут ${fromLocation.name} - ${toLocation.name}`,
-      coordinates: {
-        x: (fromLocation.x + toLocation.x) / 2,
-        y: (fromLocation.y + toLocation.y) / 2
-      },
-      from: {
-        name: fromLocation.name,
-        x: fromLocation.x,
-        y: fromLocation.y
-      },
-      to: {
-        name: toLocation.name,
-        x: toLocation.x,
-        y: toLocation.y
-      },
-      distance: parseFloat(distance)
-    };
-    
-    const result = await primaryService.createRoute(routeData);
-    
-    return { 
-      success: true, 
-      message: `Маршрут "${routeData.name}" создан через основной сервис (навигатор недоступен)`,
-      route: routeData
-    };
-    
-  } catch (error) {
-    throw new Error(`Не удалось создать маршрут: ${error.message}`);
-  }
+
+  console.log('📊 Распарсенный маршрут (single):', routeData);
+  
+  return routeData;
 };
 export const primaryService = {
   checkStatus: async () => {
@@ -293,14 +290,94 @@ getRouteById: async (id) => {
     throw handleApiError(error, 'Не удалось найти маршрут');
   }
 },
+// api.js - исправленная функция сравнения
 updateRoute: async (id, routeData) => {
   try {
-    // ТОЛЬКО ИЗМЕНЯЕМЫЕ ПОЛЯ - как в рабочем скрипте
+    console.log('🔄 Начало обновления маршрута ID:', id);
+    console.log('📝 Новые данные:', JSON.stringify(routeData, null, 2));
+
+    // Получаем текущие данные маршрута для сравнения
+    const currentRoute = await primaryService.getRouteById(id);
+    
+    if (!currentRoute) {
+      throw new Error(`Маршрут с ID ${id} не найден`);
+    }
+
+    console.log('📋 Текущие данные:', JSON.stringify(currentRoute, null, 2));
+
+    // Простая и надежная функция сравнения чисел
+    const areNumbersEqual = (a, b) => {
+      if (a === b) return true;
+      if (a == null && b == null) return true;
+      if (a == null || b == null) return false;
+      return Math.abs(parseFloat(a) - parseFloat(b)) < 0.001;
+    };
+
+    // Определяем, какие поля изменились - УПРОЩЕННАЯ ЛОГИКА
+    const changedFields = {
+      name: routeData.name !== currentRoute.name,
+      distance: !areNumbersEqual(routeData.distance, currentRoute.distance),
+      coordinates: !areNumbersEqual(routeData.coordinates?.x, currentRoute.coordinates?.x) || 
+                   !areNumbersEqual(routeData.coordinates?.y, currentRoute.coordinates?.y),
+      fromLocation: !areNumbersEqual(routeData.from?.x, currentRoute.from?.x) ||
+                    !areNumbersEqual(routeData.from?.y, currentRoute.from?.y) ||
+                    routeData.from?.name !== currentRoute.from?.name,
+      toLocation: !areNumbersEqual(routeData.to?.x, currentRoute.to?.x) ||
+                  !areNumbersEqual(routeData.to?.y, currentRoute.to?.y) ||
+                  routeData.to?.name !== currentRoute.to?.name
+    };
+
+    console.log('🔄 Измененные поля:', changedFields);
+
+    // Проверяем, есть ли вообще изменения
+    const hasChanges = Object.values(changedFields).some(Boolean);
+    if (!hasChanges) {
+      return { success: true, message: 'Нет изменений для обновления' };
+    }
+
+    // Собираем XML согласно Swagger схеме
+    let xmlParts = [];
+    
+    // ВАЖНО: поле name ОБЯЗАТЕЛЬНО должно быть всегда
+    xmlParts.push(`<name>${routeData.name}</name>`);
+
+    // Дистанция - отправляем только если изменилась
+    if (changedFields.distance) {
+      xmlParts.push(`<distance>${routeData.distance}</distance>`);
+    }
+
+    // Координаты - отправляем ВСЕ поля если изменились
+    if (changedFields.coordinates) {
+      xmlParts.push(`<coordinates>
+        <x>${routeData.coordinates?.x || 0}</x>
+        <y>${routeData.coordinates?.y || 0}</y>
+      </coordinates>`);
+    }
+
+    // Точка отправления - отправляем ВСЕ поля если изменилась
+    if (changedFields.fromLocation) {
+      xmlParts.push(`<fromLocation>
+        <x>${routeData.from?.x || 0}</x>
+        <y>${routeData.from?.y || 0}</y>
+        <name>${routeData.from?.name || ''}</name>
+      </fromLocation>`);
+    }
+
+    // Точка назначения - отправляем ВСЕ поля если изменилась
+    if (changedFields.toLocation) {
+      xmlParts.push(`<toLocation>
+        <x>${routeData.to?.x || 0}</x>
+        <y>${routeData.to?.y || 0}</y>
+        <name>${routeData.to?.name || ''}</name>
+      </toLocation>`);
+    }
+
     const xmlData = `<?xml version="1.0" encoding="UTF-8"?>
 <RouteUpdateRequest>
-  <name>${routeData.name}</name>
-  <distance>${routeData.distance}</distance>
+  ${xmlParts.join('\n  ')}
 </RouteUpdateRequest>`;
+
+    console.log('📤 Финальный XML для отправки:', xmlData);
 
     const response = await primaryApi.put(`/routes/${id}`, xmlData, {
       validateStatus: null,
@@ -309,12 +386,42 @@ updateRoute: async (id, routeData) => {
       }
     });
     
+    console.log('📥 Ответ от сервера:', {
+      status: response.status,
+      data: response.data
+    });
+    
     if (response.status === 200) {
-      return { success: true, message: 'Маршрут обновлен' };
+      return { success: true, message: 'Маршрут успешно обновлен' };
     } else {
-      throw new Error(`Ошибка обновления: статус ${response.status}`);
+      let errorMessage = `Ошибка обновления: статус ${response.status}`;
+      
+      if (typeof response.data === 'string' && response.data.includes('<?xml')) {
+        try {
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(response.data, "text/xml");
+          
+          const message = xmlDoc.getElementsByTagName('message')[0]?.textContent;
+          const details = xmlDoc.getElementsByTagName('detail');
+          
+          if (message) errorMessage = message;
+          
+          const detailMessages = [];
+          for (let i = 0; i < details.length; i++) {
+            detailMessages.push(details[i].textContent);
+          }
+          if (detailMessages.length > 0) {
+            errorMessage += ': ' + detailMessages.join(', ');
+          }
+        } catch (e) {
+          console.error('Ошибка парсинга ошибки:', e);
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
   } catch (error) {
+    console.error('❌ Критическая ошибка в updateRoute:', error);
     throw handleApiError(error, 'Не удалось обновить маршрут');
   }
 },
@@ -566,7 +673,25 @@ createRoute: async (routeData) => {
       const value = field.split('.').reduce((obj, key) => obj?.[key], routeData);
       console.log(`${field}:`, value, 'is null?', value === null, 'is undefined?', value === undefined);
     });
-    const xmlData = `<?xml version="1.0" encoding="UTF-8"?><RouteCreateRequest><name>${routeData.name}</name><coordinates><x>${Math.floor(routeData.coordinates?.x || 0)}</x><y>${Math.floor(routeData.coordinates?.y || 0)}</y></coordinates><fromLocation><name>${routeData.from?.name}</name><x>${Math.floor(routeData.from?.x || 0)}</x><y>${Math.floor(routeData.from?.y || 0)}</y></fromLocation><toLocation><name>${routeData.to?.name}</name><x>${Math.floor(routeData.to?.x || 0)}</x><y>${Math.floor(routeData.to?.y || 0)}</y></toLocation><distance>${routeData.distance}</distance></RouteCreateRequest>`;
+const xmlData = `<?xml version="1.0" encoding="UTF-8"?>
+<RouteCreateRequest>
+  <name>${routeData.name}</name>
+  <coordinates>
+    <x>${parseInt(routeData.coordinates?.x) || 0}</x>
+    <y>${parseInt(routeData.coordinates?.y) || 0}</y>
+  </coordinates>
+  <fromLocation>
+    <name>${routeData.from?.name}</name>
+    <x>${parseInt(routeData.from?.x) || 0}</x>
+    <y>${parseInt(routeData.from?.y) || 0}</y>
+  </fromLocation>
+  <toLocation>
+    <name>${routeData.to?.name}</name>
+    <x>${parseInt(routeData.to?.x) || 0}</x>
+    <y>${parseInt(routeData.to?.y) || 0}</y>
+  </toLocation>
+  <distance>${parseFloat(routeData.distance) || 0}</distance>
+</RouteCreateRequest>`;
     console.log('Отправляемый XML для создания:', xmlData);
     
     const response = await primaryApi.post('/routes', xmlData, {
@@ -674,7 +799,6 @@ export const secondaryService = {
   },
 addRouteBetween: async (idFrom, idTo, distance) => {
   try {
-    // ПРАВИЛЬНЫЙ URL согласно логам сервера: /navigator-service/navigator/route/add/{idFrom}/{idTo}/{distance}
     const correctEndpoint = `/navigator/route/add/${idFrom}/${idTo}/${distance}`;
     console.log('Используем endpoint для создания:', correctEndpoint);
     

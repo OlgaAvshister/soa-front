@@ -19,22 +19,22 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
       loadRouteData();
     }
   }, [routeId]);
-
-  const loadRouteData = async () => {
+// RouteEditForm.js - улучшенная функция loadRouteData
+const loadRouteData = async () => {
   try {
     console.log('Загрузка маршрута с ID:', routeId);
     
-    // Используем правильный метод для получения маршрута по ID
     const route = await primaryService.getRouteById(routeId);
     
-    console.log('Найденный маршрут:', route);
+    console.log('Найденный маршрут для редактирования:', route);
     
     if (route) {
+      // Убедимся, что все вложенные объекты существуют
       setFormData({
         name: route.name || '',
         coordinates: route.coordinates || { x: 0, y: 0 },
-        from: route.from || { x: 0, y: 0, name: '' },
-        to: route.to || { x: 0, y: 0, name: '' },
+        from: route.from || { x: 0, y: 0, name: '', id: null },
+        to: route.to || { x: 0, y: 0, name: '', id: null },
         distance: route.distance || 0
       });
     } else {
@@ -45,40 +45,89 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
     setError('Не удалось загрузить данные маршрута: ' + err.message);
   }
 };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  // ВАЛИДАЦИЯ КООРДИНАТ - целые числа
+  if (!Number.isInteger(formData.coordinates?.x) || !Number.isInteger(formData.coordinates?.y)) {
+    setError('Координаты маршрута должны быть целыми числами');
+    setLoading(false);
+    return;
+  }
 
-    // Валидация
-    if (formData.distance <= 0) {
-      setError('Дистанция должна быть больше 0');
-      setLoading(false);
-      return;
-    }
+  if (!Number.isInteger(formData.from?.x) || !Number.isInteger(formData.from?.y)) {
+    setError('Координаты начальной точки должны быть целыми числами');
+    setLoading(false);
+    return;
+  }
 
-    if (!formData.name.trim()) {
-      setError('Название маршрута обязательно');
-      setLoading(false);
-      return;
-    }
+  if (!Number.isInteger(formData.to?.x) || !Number.isInteger(formData.to?.y)) {
+    setError('Координаты конечной точки должны быть целыми числами');
+    setLoading(false);
+    return;
+  }
 
-    try {
-      await primaryService.updateRoute(routeId, formData);
-      setSuccess('Маршрут успешно обновлен!');
-      setTimeout(() => {
-        onRouteUpdated();
-      }, 1500);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ВАЛИДАЦИЯ ДИСТАНЦИИ - дробное число > 1
+  if (formData.distance <= 1) {
+    setError('Дистанция должна быть больше 1');
+    setLoading(false);
+    return;
+  }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  if (!formData.name.trim()) {
+    setError('Название маршрута обязательно');
+    setLoading(false);
+    return;
+  }
+
+  if (!formData.from?.name?.trim()) {
+    setError('Название точки отправления обязательно');
+    setLoading(false);
+    return;
+  }
+
+  if (!formData.to?.name?.trim()) {
+    setError('Название точки назначения обязательно');
+    setLoading(false);
+    return;
+  }
+
+  try {
+    console.log('📝 Данные для обновления:', formData);
+    
+    // Отправляем только измененные данные
+    const updateData = {
+      name: formData.name,
+      coordinates: formData.coordinates,
+      from: formData.from,
+      to: formData.to,
+      distance: formData.distance
+    };
+    
+    await primaryService.updateRoute(routeId, updateData);
+    setSuccess('Маршрут успешно обновлен!');
+    setTimeout(() => {
+      onRouteUpdated();
+    }, 1500);
+  } catch (err) {
+    console.error('❌ Ошибка обновления:', err);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+const handleChange = (e) => {
+  const { name, value } = e.target;
+  
+  console.log('📝 Изменение поля:', name, 'значение:', value);
+  
+  // ОБРАБОТКА КООРДИНАТ - только целые числа
+  if ((name.includes('.x') || name.includes('.y')) && !name.includes('name')) {
+    // Разрешаем только цифры и минус для координат
+    const numericValue = value.replace(/[^\d-]/g, '');
+    const finalValue = numericValue === '' ? '' : parseInt(numericValue) || 0;
     
     if (name.startsWith('coordinates.')) {
       const field = name.split('.')[1];
@@ -86,7 +135,7 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
         ...prev,
         coordinates: { 
           ...prev.coordinates, 
-          [field]: value === '' ? '' : parseFloat(value) || 0 
+          [field]: finalValue
         }
       }));
     } else if (name.startsWith('from.')) {
@@ -95,7 +144,7 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
         ...prev,
         from: { 
           ...prev.from, 
-          [field]: field === 'name' ? value : (value === '' ? '' : parseFloat(value) || 0)
+          [field]: finalValue
         }
       }));
     } else if (name.startsWith('to.')) {
@@ -104,17 +153,51 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
         ...prev,
         to: { 
           ...prev.to, 
-          [field]: field === 'name' ? value : (value === '' ? '' : parseFloat(value) || 0)
+          [field]: finalValue
+        }
+      }));
+    }
+  } 
+  // ДИСТАНЦИЯ - дробное число (разрешаем точку)
+  else if (name === 'distance') {
+    // Разрешаем цифры, точку и минус
+    const numericValue = value.replace(/[^\d.-]/g, '');
+    // Убираем лишние точки (оставляем только первую)
+    const cleanValue = numericValue.replace(/(\..*)\./g, '$1');
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: cleanValue === '' ? '' : parseFloat(cleanValue) || 0
+    }));
+  } else {
+    // ТЕКСТОВЫЕ ПОЛЯ (name, from.name, to.name) - без ограничений
+    if (name.startsWith('from.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        from: { 
+          ...prev.from, 
+          [field]: value
+        }
+      }));
+    } else if (name.startsWith('to.')) {
+      const field = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        to: { 
+          ...prev.to, 
+          [field]: value
         }
       }));
     } else {
+      // Поле name маршрута
       setFormData(prev => ({
         ...prev,
-        [name]: name === 'distance' ? (value === '' ? '' : parseFloat(value) || 0) : value
+        [name]: value
       }));
     }
-  };
-
+  }
+};
   return (
     <div className="item-form-container">
       <h3>Редактировать маршрут #{routeId}</h3>
@@ -142,7 +225,6 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
               <label>X</label>
               <input
                 type="number"
-                step="0.1"
                 name="coordinates.x"
                 value={formData.coordinates.x || ''}
                 onChange={handleChange}
@@ -153,7 +235,6 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
               <label>Y</label>
               <input
                 type="number"
-                step="0.1"
                 name="coordinates.y"
                 value={formData.coordinates.y || ''}
                 onChange={handleChange}
@@ -183,7 +264,6 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
               <label>X</label>
               <input
                 type="number"
-                step="0.1"
                 name="from.x"
                 value={formData.from.x || ''}
                 onChange={handleChange}
@@ -194,7 +274,6 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
               <label>Y</label>
               <input
                 type="number"
-                step="0.1"
                 name="from.y"
                 value={formData.from.y || ''}
                 onChange={handleChange}
@@ -224,7 +303,6 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
               <label>X</label>
               <input
                 type="number"
-                step="0.1"
                 name="to.x"
                 value={formData.to.x || ''}
                 onChange={handleChange}
@@ -235,7 +313,6 @@ const RouteEditForm = ({ routeId, onRouteUpdated, onCancel }) => {
               <label>Y</label>
               <input
                 type="number"
-                step="0.1"
                 name="to.y"
                 value={formData.to.y || ''}
                 onChange={handleChange}

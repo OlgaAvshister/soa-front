@@ -14,137 +14,113 @@ const RouteFinder = () => {
   const [showAllTo, setShowAllTo] = useState(false);
   const [searchFrom, setSearchFrom] = useState('');
   const [searchTo, setSearchTo] = useState('');
+  // Новое состояние для сортировки
+  const [sortBy, setSortBy] = useState('distance');
 
   useEffect(() => {
     loadExistingLocations();
   }, []);
 
-const loadExistingLocations = async () => {
-  try {
-    const routes = await primaryService.getRoutes({ size: 100 });
-    const fromMap = new Map();
-    const toMap = new Map();
-    
-    console.log('Все маршруты для отладки:', routes.routes);
-    
-    routes.routes.forEach(route => {
-      console.log('Маршрут:', route.id, 'From:', route.from, 'To:', route.to);
+  const loadExistingLocations = async () => {
+    try {
+      const routes = await primaryService.getRoutes({ size: 100 });
+      const fromMap = new Map();
+      const toMap = new Map();
       
-      // From locations
-      if (route.from?.name) {
-        const locationId = route.from.id || route.id; // Используем ID локации или ID маршрута как fallback
-        const key = `from_${locationId}`;
-        fromMap.set(key, {
-          name: route.from.name,
-          id: locationId,
-          x: route.from.x,
-          y: route.from.y,
-          originalData: route.from // для отладки
-        });
-      }
+      routes.routes.forEach(route => {
+        // From locations
+        if (route.from?.name) {
+          const locationId = route.from.id || route.id;
+          const key = `from_${locationId}`;
+          fromMap.set(key, {
+            name: route.from.name,
+            id: locationId,
+            x: route.from.x,
+            y: route.from.y,
+            originalData: route.from
+          });
+        }
+        
+        // To locations
+        if (route.to?.name) {
+          const locationId = route.to.id || route.id;
+          const key = `to_${locationId}`;
+          toMap.set(key, {
+            name: route.to.name,
+            id: locationId,
+            x: route.to.x,
+            y: route.to.y,
+            originalData: route.to
+          });
+        }
+      });
       
-      // To locations
-      if (route.to?.name) {
-        const locationId = route.to.id || route.id; // Используем ID локации или ID маршрута как fallback
-        const key = `to_${locationId}`;
-        toMap.set(key, {
-          name: route.to.name,
-          id: locationId,
-          x: route.to.x,
-          y: route.to.y,
-          originalData: route.to // для отладки
-        });
-      }
-    });
-    
-    console.log('From локации:', Array.from(fromMap.values()));
-    console.log('To локации:', Array.from(toMap.values()));
-    
-    setFromLocations(Array.from(fromMap.values()));
-    setToLocations(Array.from(toMap.values()));
-  } catch (err) {
-    console.error('Ошибка загрузки локаций:', err);
-  }
-};
-const handleFindRoutes = async () => {
-  if (!fromId || !toId) {
-    setError('Введите ID обеих точек');
-    return;
-  }
+      setFromLocations(Array.from(fromMap.values()));
+      setToLocations(Array.from(toMap.values()));
+    } catch (err) {
+      console.error('Ошибка загрузки локаций:', err);
+    }
+  };
 
-  setLoading(true);
-  setError('');
-  setResult(null);
+  const handleFindRoutes = async () => {
+    if (!fromId || !toId) {
+      setError('Введите ID обеих точек');
+      return;
+    }
 
-  try {
-    console.log('🔍 Поиск маршрутов между ЛОКАЦИЯМИ:', { 
-      fromId, 
-      toId,
-      fromLocation: fromLocations.find(l => l.id == fromId),
-      toLocation: toLocations.find(l => l.id == toId)
-    });
-    
-    // ПРОВЕРИМ СУЩЕСТВОВАНИЕ ЛОКАЦИЙ В ДАННЫХ
-    const allRoutes = await primaryService.getRoutes({ size: 100 });
-    
-    // Ищем маршруты, где from.id совпадает с fromId
-    const routesFrom = allRoutes.routes.filter(route => 
-      route.from?.id == fromId
-    );
-    
-    // Ищем маршруты, где to.id совпадает с toId  
-    const routesTo = allRoutes.routes.filter(route => 
-      route.to?.id == toId
-    );
-    
-    // Ищем конкретный маршрут между этими локациями
-    const directRoute = allRoutes.routes.find(route => 
-      route.from?.id == fromId && route.to?.id == toId
-    );
-    
-    console.log('Отладочная информация о локациях:', {
-      fromId,
-      toId,
-      routesFrom: routesFrom.map(r => ({ id: r.id, from: r.from, to: r.to })),
-      routesTo: routesTo.map(r => ({ id: r.id, from: r.from, to: r.to })),
-      directRoute: directRoute ? { id: directRoute.id, from: directRoute.from, to: directRoute.to } : null
-    });
+    setLoading(true);
+    setError('');
+    setResult(null);
 
-    const foundRoutes = await secondaryService.findRoutesBetween(fromId, toId, 'distance');
-    console.log('📋 Результат поиска от навигатора:', foundRoutes);
-    
-    const fromLocation = fromLocations.find(l => l.id == fromId);
-    const toLocation = toLocations.find(l => l.id == toId);
-    
-    if (foundRoutes.routes && foundRoutes.routes.length === 0) {
-      if (directRoute) {
-        setError(`Маршрут между "${fromLocation?.name || fromId}" и "${toLocation?.name || toId}" существует (ID: ${directRoute.id}), но навигатор его не находит. Возможна проблема с сервером навигатора.`);
-      } else {
+    try {
+      console.log('🔍 Поиск маршрутов между ЛОКАЦИЯМИ:', { 
+        fromId, 
+        toId,
+        sortBy
+      });
+      
+      const foundRoutes = await secondaryService.findRoutesBetween(fromId, toId, sortBy);
+      console.log('📋 Результат поиска от навигатора:', foundRoutes);
+      
+      const fromLocation = fromLocations.find(l => l.id == fromId);
+      const toLocation = toLocations.find(l => l.id == toId);
+      
+      if (foundRoutes.routes && foundRoutes.routes.length === 0) {
         setError(`Маршруты между "${fromLocation?.name || fromId}" и "${toLocation?.name || toId}" не найдены.`);
       }
+      
+      setResult(foundRoutes);
+    } catch (err) {
+      console.error('Ошибка поиска:', err);
+      
+      if (err.message.includes('404')) {
+        const fromLocation = fromLocations.find(l => l.id == fromId);
+        const toLocation = toLocations.find(l => l.id == toId);
+        setError(`Навигатор не нашел маршруты между "${fromLocation?.name || fromId}" и "${toLocation?.name || toId}".`);
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Новая функция для изменения сортировки
+  const handleSortChange = (newSortBy) => {
+    setSortBy(newSortBy);
     
-    setResult(foundRoutes);
-  } catch (err) {
-    console.error('Ошибка поиска:', err);
-    
-    // Более информативное сообщение об ошибке
-    if (err.message.includes('404')) {
-      const fromLocation = fromLocations.find(l => l.id == fromId);
-      const toLocation = fromLocations.find(l => l.id == toId);
-      setError(`Навигатор не нашел маршруты между "${fromLocation?.name || fromId}" и "${toLocation?.name || toId}". Локации могут не существовать в системе навигатора.`);
-    } else {
-      setError(err.message);
+    // Если уже есть результаты, перезапрашиваем с новой сортировкой
+    if (result && fromId && toId) {
+      handleFindRoutes();
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
   const handleClear = () => {
     setFromId('');
     setToId('');
     setResult(null);
     setError('');
+    setSortBy('distance');
   };
 
   // Фильтруем локации по поиску
@@ -163,41 +139,53 @@ const handleFindRoutes = async () => {
     <div className="route-finder">
       <h3>Найти маршруты между точками</h3>
       
-      <div className="finder-form">
-        <div className="input-group">
-          <label>ID начальной точки:</label>
-          <input
-            type="number"
-            value={fromId}
-            onChange={(e) => setFromId(e.target.value)}
-            placeholder="Введите ID из списка слева"
-            min="1"
-          />
-        </div>
-        
-        <div className="input-group">
-          <label>ID конечной точки:</label>
-          <input
-            type="number"
-            value={toId}
-            onChange={(e) => setToId(e.target.value)}
-            placeholder="Введите ID из списка справа"
-            min="1"
-          />
-        </div>
+      <div className="input-group">
+        <label>ID начальной точки:</label>
+        <input
+          type="number"
+          value={fromId}
+          onChange={(e) => setFromId(e.target.value)}
+          placeholder="Введите ID из списка слева"
+          min="1"
+        />
+      </div>
+      
+      <div className="input-group">
+        <label>ID конечной точки:</label>
+        <input
+          type="number"
+          value={toId}
+          onChange={(e) => setToId(e.target.value)}
+          placeholder="Введите ID из списка справа"
+          min="1"
+        />
+      </div>
 
-        <div className="finder-actions">
-          <button 
-            onClick={handleFindRoutes} 
-            disabled={loading}
-            className="btn btn-primary"
-          >
-            {loading ? 'Поиск...' : 'Найти маршруты'}
-          </button>
-          <button onClick={handleClear} className="btn btn-secondary">
-            Очистить
-          </button>
-        </div>
+      {/* Блок выбора сортировки */}
+      <div className="input-group">
+        <label>Сортировка результатов:</label>
+        <select 
+          value={sortBy} 
+          onChange={(e) => handleSortChange(e.target.value)}
+          className="sort-select"
+        >
+          <option value="distance">По дистанции (возрастание)</option>
+          <option value="name">По названию (А-Я)</option>
+          <option value="creationDate">По дате создания (старые сначала)</option>
+        </select>
+      </div>
+
+      <div className="finder-actions">
+        <button 
+          onClick={handleFindRoutes} 
+          disabled={loading}
+          className="btn btn-primary"
+        >
+          {loading ? 'Поиск...' : 'Найти маршруты'}
+        </button>
+        <button onClick={handleClear} className="btn btn-secondary">
+          Очистить
+        </button>
       </div>
 
       {/* Две колонки с локациями */}
@@ -224,7 +212,6 @@ const handleFindRoutes = async () => {
             />
           </div>
           
-          {/* ТОЛЬКО ДЛЯ ОТКУДА */}
           <div className={`locations-grid ${showAllFrom ? 'show-all' : ''}`}>
             {displayFrom.map((location, index) => (
               <div 
@@ -274,7 +261,6 @@ const handleFindRoutes = async () => {
             />
           </div>
           
-          {/* ТОЛЬКО ДЛЯ КУДА */}
           <div className={`locations-grid ${showAllTo ? 'show-all' : ''}`}>
             {displayTo.map((location, index) => (
               <div 
@@ -307,7 +293,18 @@ const handleFindRoutes = async () => {
 
       {result && (
         <div className="finder-results">
-          <h4>Результаты поиска:</h4>
+          <div className="results-header">
+            <h4>Результаты поиска:</h4>
+            {/* Индикатор текущей сортировки */}
+            <div className="sort-indicator">
+              Сортировка: 
+              <span className="sort-value">
+                {sortBy === 'distance' && ' по дистанции'}
+                {sortBy === 'name' && ' по названию'}
+                {sortBy === 'creationDate' && ' по дате создания'}
+              </span>
+            </div>
+          </div>
           
           {result.routes && result.routes.length > 0 ? (
             <div className="routes-list">
@@ -315,6 +312,9 @@ const handleFindRoutes = async () => {
                 <div key={route.id} className="route-card">
                   <h5>Маршрут #{route.id}: {route.name}</h5>
                   <p><strong>Дистанция:</strong> {route.distance}</p>
+                  {route.creationDate && (
+                    <p><strong>Дата создания:</strong> {new Date(route.creationDate).toLocaleDateString()}</p>
+                  )}
                   <p><strong>От:</strong> {route.from?.name || 'Не указано'} ({route.from?.x}, {route.from?.y})</p>
                   <p><strong>К:</strong> {route.to?.name || 'Не указано'} ({route.to?.x}, {route.to?.y})</p>
                 </div>

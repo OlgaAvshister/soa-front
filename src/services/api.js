@@ -1,7 +1,6 @@
 import axios from 'axios';
-// api.js
-const PRIMARY_SERVICE_URL = 'https://localhost:18443/route-management-service';
-const SECONDARY_SERVICE_URL = 'https://localhost:18444/navigator-service';
+const PRIMARY_SERVICE_URL = 'https://localhost:38443/route-management-service';
+const SECONDARY_SERVICE_URL = 'https://localhost:38080';
 
 const primaryApi = axios.create({
   baseURL: PRIMARY_SERVICE_URL,

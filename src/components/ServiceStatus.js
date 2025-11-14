@@ -28,11 +28,11 @@ const checkService = async (url, name) => {
 // ServiceStatus.js
 const checkAllServices = async () => {
   const primaryResult = await checkService(
-    'https://localhost:18443/route-management-service/application.wadl',
+    'https://localhost:38443/route-management-service/application.wadl',
     'primary'
   );
   const secondaryResult = await checkService(
-    'https://localhost:18444/navigator-service/application.wadl', 
+    'https://localhost:38080/application.wadl', 
     'secondary'
   );
 
